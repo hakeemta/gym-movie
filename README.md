@@ -1,2 +1,4 @@
-# movie-env
-DL Framed Movies Recommendation Environment
+# gym-movie
+DL-framed Movies Recommendation Environment
+
+Data sources: https://grouplens.org/datasets/movielens/
