@@ -18,14 +18,9 @@ class MovieEnv(gym.Env):
         self.process_ratings()
         
 
-    def process_ratings(self):
-        self._df_ratings = pd.read_csv(self._fn_ratings)
-        # Drop the timestap on ratings
-        self._df_ratings.drop('timestamp', axis=1, inplace=True)
-
     def process_movies(self):
         '''
-        Generate movies features from hot-encoding its genres
+        Generate movie features from hot-encoding its genres
         '''
         
         df_movies = pd.read_csv(self._fn_movies)
@@ -45,7 +40,27 @@ class MovieEnv(gym.Env):
         # Combine with the original DF title
         self._df_movies = pd.concat([df_movies.drop('genres', axis=1).set_index('movieId'), df_expanded], axis=1)
 
+    
+    def process_ratings(self, absolute=False):
+        '''
+        Rating as user-movie feature and generate user features from hot-encoding its movies genres
+        '''
+        self._df_ratings = pd.read_csv(self._fn_ratings)
+        # Drop the timestap on ratings
+        self._df_ratings.drop('timestamp', axis=1, inplace=True)
 
+        self._df_users_genres = self._df_ratings.join(self._df_movies, on='movieId').drop(['movieId', 'rating'], 
+                                                                  axis=1).groupby('userId').sum()
+
+        self._df_users_counts = self._df_ratings.groupby('userId').count()['rating']
+        
+        scaler = self._df_users_genres.values.sum(axis=1, keepdims=True)
+        if absolute:
+            scaler = self._df_users_counts.values[..., None]
+
+        self._df_users_pref = self._df_users_genres / scaler
+
+    
     def step(self, action):
         obs = None
         reward = 0

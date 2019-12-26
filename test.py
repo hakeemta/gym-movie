@@ -6,3 +6,5 @@ print()
 
 print( env._df_movies.head() )
 print( env._df_ratings.head() )
+
+print( env._df_users_pref.head() )
