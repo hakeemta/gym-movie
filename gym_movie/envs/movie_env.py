@@ -3,6 +3,7 @@ from gym import error, spaces, utils
 from gym.utils import seeding
 
 import pandas as pd
+import numpy as np
 
 class MovieEnv(gym.Env):
     metadata = {'render.modes': ['human']}
@@ -13,9 +14,11 @@ class MovieEnv(gym.Env):
         
         self._fn_movies = f'{self._data_dir }/movies.csv'
         self._fn_ratings = f'{self._data_dir }/ratings.csv'
-
+        
         self.process_movies()
         self.process_ratings()
+        
+        self._movies_cols = self._df_movies.columns
         
 
     def process_movies(self):
@@ -61,15 +64,50 @@ class MovieEnv(gym.Env):
         self._df_users_pref = self._df_users_genres / scaler
 
     
+    def process_context(self):
+        NotImplementedError
+
+
+    def sample_movie(self):
+        id = self._movies_ids.pop()
+        return self._df_movies.loc[ [id], self._movies_cols[1:] ].values
+
+
     def step(self, action):
-        obs = None
         reward = 0
         done = False
+
+        # Sample a movie
+        movie_feat = self.sample_movie()
+        
+        rem = len(self._movies_ids)
+        # print('Size:', rem)
+        if rem < 1:
+            done = True
+        
+        obs = np.concatenate((self._current_user.values, movie_feat), axis=1)
         return obs, reward, done, self.info
+        
+
+    def refresh_movies(self):
+        # Get all the movies
+        idx = self._df_movies.index.values
+        # Shuffle the movies ids
+        np.random.shuffle(idx)
+        return list(idx)
+
 
     def reset(self):
-        obs = None
-        return obs
+        print(self._df_movies.shape)
+        # Sample a user and refresh the movies candidates list
+        self._current_user = self._df_users_pref.sample()
+        self._movies_ids = self.refresh_movies()
+        print('User:', self._current_user.index.values[0] )
+
+        # Sample a movie
+        movie_feat = self.sample_movie()
+        return np.concatenate((self._current_user.values, movie_feat), axis=1)
+
 
     def render(self, mode='human'):
         NotImplementedError
