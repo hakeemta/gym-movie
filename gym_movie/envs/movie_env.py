@@ -19,6 +19,7 @@ class MovieEnv(gym.Env):
         self.process_ratings()
         
         self._movies_cols = self._df_movies.columns
+        self._current_movie = None
         
 
     def process_movies(self):
@@ -70,13 +71,12 @@ class MovieEnv(gym.Env):
 
     def sample_movie(self):
         id = self._movies_ids.pop()
-        return self._df_movies.loc[ [id], self._movies_cols[1:] ].values
+        self._current_movie = self._df_movies.loc[ [id], self._movies_cols[1:] ]
+        return self._current_movie.values
 
 
     def step(self, action):
-        reward = 0
         done = False
-
         # Sample a movie
         movie_feat = self.sample_movie()
         
@@ -84,25 +84,35 @@ class MovieEnv(gym.Env):
         # print('Size:', rem)
         if rem < 1:
             done = True
+
+        user_id = self._current_user.index.values[0]
+        movie_id = self._current_movie.index.values[0]
+
+        rating = self._df_ratings[ (self._df_ratings.userId == user_id) & (self._df_ratings.movieId == movie_id) ].rating
+        reward = rating.values[0] / 5.0
         
         obs = np.concatenate((self._current_user.values, movie_feat), axis=1)
         return obs, reward, done, self.info
         
 
-    def refresh_movies(self):
-        # Get all the movies
-        idx = self._df_movies.index.values
+    def refresh_movies(self, offline=True):
+        # Get all the movies (for the user, if offline mode)
+        if offline:
+            user_id = self._current_user.index.values[0]
+            idx = self._df_ratings[ self._df_ratings.userId == user_id ].movieId.values
+        else:
+            idx = self._df_movies.index.values
         # Shuffle the movies ids
         np.random.shuffle(idx)
         return list(idx)
 
 
     def reset(self):
-        print(self._df_movies.shape)
         # Sample a user and refresh the movies candidates list
         self._current_user = self._df_users_pref.sample()
         self._movies_ids = self.refresh_movies()
         print('User:', self._current_user.index.values[0] )
+        print('Movies:', len(self._movies_ids) )
 
         # Sample a movie
         movie_feat = self.sample_movie()
